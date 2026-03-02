@@ -301,6 +301,27 @@
   const canvas = document.getElementById("c");
   const ctx = canvas.getContext("2d");
 
+
+  // ---------------- Canvas polyfills (older Android WebView/Chrome) ----------------
+  if (typeof CanvasRenderingContext2D !== "undefined" && !CanvasRenderingContext2D.prototype.roundRect) {
+    CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+      if (Array.isArray(r)) r = r[0] ?? 0;
+      r = Math.max(0, Math.min(r || 0, Math.min(w, h) / 2));
+      this.beginPath();
+      this.moveTo(x + r, y);
+      this.lineTo(x + w - r, y);
+      this.arcTo(x + w, y, x + w, y + r, r);
+      this.lineTo(x + w, y + h - r);
+      this.arcTo(x + w, y + h, x + w - r, y + h, r);
+      this.lineTo(x + r, y + h);
+      this.arcTo(x, y + h, x, y + h - r, r);
+      this.lineTo(x, y + r);
+      this.arcTo(x, y, x + r, y, r);
+      this.closePath();
+      return this;
+    };
+  }
+
   const DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
   function resize() {
     canvas.width = Math.floor(innerWidth * DPR);
@@ -565,9 +586,6 @@
     }
     ctx.globalAlpha = 1;
   }
-
-    return dx*dx + dy*dy;
-  };
 
   // ---------------- World ----------------
   const world = { w: 8000, h: 5000 };
@@ -1364,7 +1382,8 @@ function markMissionDone(type, target) {
       g.closePath();
       g.fill();
     }
-
+    g.restore();
+  }
 
   function drawWaypointIconWorld(g, x, y, angleRad, size) {
     // A little flag + star, rotated to point toward the waypoint
@@ -1855,15 +1874,40 @@ updateHud();
     last = now;
     update(dt);
     render();
-    requestAnimationFrame(loop);
+    requestAnimationFrame(safeLoop);
   }
+
+  // Crash guard: if something throws during update/render, show an on-screen message (instead of a blank screen)
+  function safeLoop(ts) {
+    try {
+      loop(ts);
+    } catch (err) {
+      console.error(err);
+      // draw the error text on canvas so it's visible even if UI broke
+      try {
+        ctx.setTransform(1,0,0,1,0,0);
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        ctx.fillStyle = "rgba(0,0,0,0.88)";
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.fillStyle = "rgba(255,255,255,0.92)";
+        ctx.font = `${24*DPR}px system-ui`;
+        ctx.fillText("Planet Missions", 24*DPR, 50*DPR);
+        ctx.font = `${16*DPR}px system-ui`;
+        ctx.fillText("Oops — something crashed. Refresh the page.", 24*DPR, 80*DPR);
+      } catch {}
+      try { showToast("Oops — something crashed. Refresh the page.", 6.0); } catch {}
+      return; // stop looping
+    }
+    requestAnimationFrame(safeLoop);
+  }
+
 
   // First toast + waypoint
   showToast("Welcome, Space Explorer! Use the joystick to fly 🚀", 2.2);
   updateHud();
   // Speak the first mission (after first interaction on mobile)
   setTimeout(() => { speakMission(currentMission()); }, 250);
-  requestAnimationFrame(loop);
+  requestAnimationFrame(safeLoop);
 
 })();
 </script>
