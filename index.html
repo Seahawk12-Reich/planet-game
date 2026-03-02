@@ -1,0 +1,1871 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <title>Planet Missions</title>
+  <style>
+    html, body { margin:0; height:100%; background:#05060a; overflow:hidden; font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial; touch-action:none; }
+    canvas { display:block; width:100vw; height:100vh; }
+
+    /* Tablet UI */
+    .ui {
+      position: fixed; inset: 0; pointer-events: none;
+    }
+
+    .hud {
+      position: absolute; top: 10px; left: 10px;
+      background: rgba(0,0,0,0.35);
+      color: rgba(255,255,255,0.92);
+      padding: 10px 12px;
+      border-radius: 14px;
+      backdrop-filter: blur(8px);
+      max-width: min(720px, calc(100vw - 20px));
+      pointer-events: none;
+    }
+    .hud .title { font-weight: 700; font-size: 18px; margin-bottom: 4px; }
+    .hud .line { font-size: 14px; line-height: 1.35; margin: 2px 0; }
+    .hud .small { opacity: 0.8; font-size: 12px; }
+
+    .toast {
+      position: absolute; top: 120px; left: 10px;
+      background: rgba(0,0,0,0.45);
+      color: rgba(255,255,255,0.95);
+      padding: 10px 12px;
+      border-radius: 14px;
+      backdrop-filter: blur(8px);
+      pointer-events: none;
+      max-width: min(720px, calc(100vw - 20px));
+      display: none;
+    }
+
+    /* Joystick */
+    .joyWrap {
+      position: absolute; left: 18px; bottom: 18px;
+      width: 170px; height: 170px;
+      pointer-events: auto;
+    }
+    .joyBase {
+      width: 100%; height: 100%;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+      border: 2px solid rgba(255,255,255,0.12);
+      backdrop-filter: blur(8px);
+      position: relative;
+    }
+    .joyKnob {
+      width: 68px; height: 68px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.18);
+      border: 2px solid rgba(255,255,255,0.18);
+      position: absolute;
+      left: 50%; top: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    /* Buttons */
+    .btnCol {
+      position: absolute; right: 18px; bottom: 18px;
+      display: flex; flex-direction: column; gap: 12px;
+      pointer-events: auto;
+    }
+    .btn {
+      width: 140px; height: 54px;
+      border-radius: 16px;
+      border: 2px solid rgba(255,255,255,0.16);
+      background: rgba(0,0,0,0.30);
+      color: rgba(255,255,255,0.92);
+      font-size: 16px; font-weight: 700;
+      backdrop-filter: blur(8px);
+      user-select: none;
+      touch-action: none;
+    }
+    .btn:active { transform: scale(0.98); }
+
+    .btnSmallRow {
+      display: flex; gap: 12px;
+    }
+    .btnSmall {
+      width: 64px; height: 54px;
+      border-radius: 16px;
+      border: 2px solid rgba(255,255,255,0.16);
+      background: rgba(0,0,0,0.30);
+      color: rgba(255,255,255,0.92);
+      font-size: 16px; font-weight: 800;
+      backdrop-filter: blur(8px);
+      user-select: none;
+      touch-action: none;
+    }
+
+    /* Map Overlay */
+    .mapOverlay {
+      position: absolute; inset: 0;
+      background: rgba(0,0,0,0.70);
+      backdrop-filter: blur(10px);
+      display: none;
+      pointer-events: auto;
+    }
+    .mapPanel {
+      position: absolute; inset: 10px;
+      border-radius: 18px;
+      border: 2px solid rgba(255,255,255,0.10);
+      overflow: hidden;
+    }
+    .mapTop {
+      position: absolute; left: 0; right: 0; top: 0;
+      height: 54px;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 12px;
+      background: rgba(0,0,0,0.35);
+      color: rgba(255,255,255,0.92);
+    }
+    .mapTop .left { font-weight: 800; }
+    .mapTop .right { display:flex; gap:10px; }
+    .pill {
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 2px solid rgba(255,255,255,0.14);
+      background: rgba(255,255,255,0.06);
+      font-weight: 700;
+    }
+    .mapCanvas {
+      position: absolute; inset: 54px 0 0 0;
+    }
+
+    /* Tiny note for keyboard */
+    .kbdNote {
+      position: absolute; right: 10px; top: 10px;
+      background: rgba(0,0,0,0.25);
+      color: rgba(255,255,255,0.70);
+      padding: 8px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      pointer-events: none;
+    }
+  
+    /* Badges / Skin UI */
+    .badgePop {
+      position: absolute; right: 12px; top: 78px;
+      background: rgba(0,0,0,0.45);
+      color: rgba(255,255,255,0.95);
+      padding: 12px 14px;
+      border-radius: 16px;
+      border: 2px solid rgba(255,255,255,0.12);
+      backdrop-filter: blur(10px);
+      max-width: min(520px, calc(100vw - 24px));
+      display: none;
+      pointer-events: none;
+    }
+    .badgePop .bTitle { font-weight: 900; font-size: 16px; margin-bottom: 4px; }
+    .badgePop .bDesc { font-size: 13px; opacity: 0.9; line-height: 1.25; }
+    .badgePop .bSmall { font-size: 12px; opacity: 0.75; margin-top: 6px; }
+    .mapTop .right .pillBtn {
+      cursor: pointer;
+      user-select: none;
+      touch-action: none;
+    }
+
+
+    /* Badge Collection Overlay */
+    .collectOverlay {
+      position: absolute; inset: 0;
+      background: rgba(0,0,0,0.78);
+      backdrop-filter: blur(10px);
+      display: none;
+      pointer-events: auto;
+    }
+    .collectPanel {
+      position: absolute; inset: 10px;
+      border-radius: 18px;
+      border: 2px solid rgba(255,255,255,0.10);
+      overflow: hidden;
+      background: rgba(0,0,0,0.22);
+    }
+    .collectTop {
+      position: absolute; left: 0; right: 0; top: 0;
+      height: 54px;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 12px;
+      background: rgba(0,0,0,0.35);
+      color: rgba(255,255,255,0.92);
+    }
+    .collectTop .left { font-weight: 900; }
+    .collectBody {
+      position: absolute; inset: 54px 0 0 0;
+      overflow: auto;
+      padding: 14px;
+      color: rgba(255,255,255,0.92);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+    }
+    .card {
+      border-radius: 16px;
+      border: 2px solid rgba(255,255,255,0.10);
+      background: rgba(255,255,255,0.06);
+      padding: 12px;
+    }
+    .card .cTitle { font-weight: 900; margin-bottom: 6px; }
+    .card .cDesc { font-size: 13px; opacity: 0.9; line-height: 1.25; }
+    .card.locked { opacity: 0.55; filter: grayscale(0.4); }
+    .rowBtns { display:flex; gap:10px; flex-wrap: wrap; margin-top: 12px; }
+    .dangerBtn {
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 2px solid rgba(255,80,120,0.35);
+      background: rgba(255,80,120,0.12);
+      color: rgba(255,255,255,0.92);
+      font-weight: 900;
+      user-select: none;
+      touch-action: none;
+    }
+
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div class="ui" id="ui">
+  <div class="hud" id="hud">
+    <div class="title">Planet Missions 🚀</div>
+    <div class="line" id="missionLine">Loading…</div>
+    <div class="line small" id="cargoLine">Cargo: None</div>
+    <div class="line small" id="waypointLine">Waypoint: None</div>
+  </div>
+  <div class="toast" id="toast"></div>
+  <div class="badgePop" id="badgePop"></div>
+
+  <div class="joyWrap" id="joyWrap">
+    <div class="joyBase" id="joyBase">
+      <div class="joyKnob" id="joyKnob"></div>
+    </div>
+  </div>
+
+  <div class="btnCol">
+    <button class="btn" id="btnInteract">INTERACT</button>
+    <button class="btn" id="btnBoost">BOOST</button>
+    <div class="btnSmallRow">
+      <button class="btnSmall" id="btnMap">MAP</button>
+      <button class="btnSmall" id="btnBadges">🏆</button>
+      <button class="btnSmall" id="btnCenter">◎</button>
+    </div>
+  </div>
+
+  <div class="kbdNote">Keyboard: WASD/Arrows · Shift Boost · Space Interact · M Map</div>
+
+  <div class="mapOverlay" id="mapOverlay">
+    <div class="mapPanel">
+      <div class="mapTop">
+        <div class="left">Solar Map</div>
+        <div class="right">
+          <div class="pill pillBtn" id="pillSound">Sound: On</div>
+          <div class="pill pillBtn" id="pillVoice">Voice: On</div>
+          <div class="pill pillBtn" id="pillSkin">Skin: Mint</div>
+          <div class="pill" id="mapHint">Tap a planet to set waypoint</div>
+          <button class="btnSmall" id="btnCloseMap">✕</button>
+        </div>
+      </div>
+      <canvas class="mapCanvas" id="mapCanvas"></canvas>
+    </div>
+  </div>
+</div>
+  <div class="collectOverlay" id="collectOverlay">
+    <div class="collectPanel">
+      <div class="collectTop">
+        <div class="left">Badges & Skins</div>
+        <div class="right">
+          <div class="pill" id="collectSummary">0/0</div>
+          <button class="btnSmall" id="btnCloseCollect">✕</button>
+        </div>
+      </div>
+      <div class="collectBody">
+        <div class="pill" style="display:inline-block;margin-bottom:10px;">Tip: Earn badges to unlock new spaceship skins. Tap Skin on the MAP to switch.</div>
+        <h3 style="margin:10px 0 8px 0;">Badges</h3>
+        <div class="grid" id="badgeGrid"></div>
+        <h3 style="margin:16px 0 8px 0;">Skins</h3>
+        <div class="grid" id="skinGrid"></div>
+        <div class="rowBtns">
+          <button class="dangerBtn" id="btnResetProgress">Reset Progress</button>
+        </div>
+        <div style="margin-top:10px;font-size:12px;opacity:0.75;">Reset clears badges/skins and restarts missions on this device.</div>
+      </div>
+    </div>
+  </div>
+
+
+<script>
+(() => {
+  // ---------------- Canvas setup ----------------
+  const canvas = document.getElementById("c");
+  const ctx = canvas.getContext("2d");
+
+  const DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  function resize() {
+    canvas.width = Math.floor(innerWidth * DPR);
+    canvas.height = Math.floor(innerHeight * DPR);
+  }
+  addEventListener("resize", resize);
+  resize();
+
+  // Map canvas
+  const mapOverlay = document.getElementById("mapOverlay");
+  const mapCanvas = document.getElementById("mapCanvas");
+  const mapCtx = mapCanvas.getContext("2d");
+  function resizeMap() {
+    const rect = mapCanvas.getBoundingClientRect();
+    mapCanvas.width = Math.floor(rect.width * DPR);
+    mapCanvas.height = Math.floor(rect.height * DPR);
+  }
+  addEventListener("resize", resizeMap);
+  resizeMap();
+
+  // ---------------- Helpers ----------------
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const dist2 = (ax, ay, bx, by) => {
+    const dx = ax - bx, dy = ay - by;
+    return dx*dx + dy*dy;
+  };
+
+  // ---------------- Settings (Sound / Voice / Skins) ----------------
+  const SETTINGS_KEY = "planetGameSettings_v1";
+  const PROGRESS_KEY = "planetGameProgress_v1";
+
+  let userInteracted = false; // required for audio/voice on many mobile browsers
+  document.addEventListener("pointerdown", () => { userInteracted = true; }, { passive: true });
+
+  const defaultSettings = {
+    soundOn: true,
+    voiceOn: true,
+    skinId: "mint"
+  };
+
+  function loadSettings() {
+    try {
+      const raw = localStorage.getItem(SETTINGS_KEY);
+      return raw ? { ...defaultSettings, ...JSON.parse(raw) } : { ...defaultSettings };
+    } catch {
+      return { ...defaultSettings };
+    }
+  }
+  function saveSettings() {
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch {}
+  }
+
+  const settings = loadSettings();
+
+  // ---------------- Tiny Sound FX (WebAudio) ----------------
+  let audioCtx = null;
+  function getAudioCtx() {
+    if (!audioCtx) {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return null;
+      audioCtx = new Ctx();
+    }
+    // Some browsers start suspended until user gesture
+    if (audioCtx.state === "suspended" && userInteracted) audioCtx.resume().catch(()=>{});
+    return audioCtx;
+  }
+
+  function playTone(freq=440, dur=0.10, type="sine", vol=0.08) {
+    if (!settings.soundOn) return;
+    const ac = getAudioCtx();
+    if (!ac) return;
+
+    const t0 = ac.currentTime;
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t0);
+
+    // envelope
+    gain.gain.setValueAtTime(0.0001, t0);
+    gain.gain.linearRampToValueAtTime(vol, t0 + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+
+    osc.connect(gain);
+    gain.connect(ac.destination);
+
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.02);
+  }
+
+  const sfx = {
+    click:   () => playTone(520, 0.06, "square", 0.05),
+    boostOn: () => playTone(220, 0.08, "sawtooth", 0.06),
+    arrive:  () => { playTone(523.25, 0.08, "triangle", 0.07); setTimeout(()=>playTone(659.25,0.10,"triangle",0.07),70); },
+    collect: () => { playTone(784, 0.07, "triangle", 0.08); setTimeout(()=>playTone(988,0.10,"triangle",0.08),70); },
+    photo:   () => { playTone(880, 0.05, "square", 0.06); setTimeout(()=>playTone(1760,0.06,"square",0.05),45); },
+    deliver: () => { playTone(392, 0.10, "triangle", 0.08); setTimeout(()=>playTone(523.25,0.10,"triangle",0.08),90); setTimeout(()=>playTone(659.25,0.14,"triangle",0.08),180); },
+    bonk:    () => playTone(140, 0.12, "sawtooth", 0.07),
+    badge:   () => { playTone(660, 0.07, "triangle", 0.08); setTimeout(()=>playTone(880,0.12,"triangle",0.08),70); }
+  };
+
+  // ---------------- Voice narration (SpeechSynthesis) ----------------
+  let lastSpoken = "";
+  let lastSpokenAt = 0;
+
+  function speak(text) {
+    if (!settings.voiceOn) return;
+    if (!("speechSynthesis" in window)) return;
+    if (!userInteracted) return; // don't annoy / or fail silently on mobile until user gesture
+
+    const now = performance.now();
+    // avoid repeats / spam
+    if (text === lastSpoken && (now - lastSpokenAt) < 5000) return;
+
+    try {
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.rate = 0.95;
+      u.pitch = 1.05;
+      u.volume = 1.0;
+      window.speechSynthesis.speak(u);
+      lastSpoken = text;
+      lastSpokenAt = now;
+    } catch {}
+  }
+
+  function speakMission(m) {
+    if (!m) return;
+    // Kid-friendly phrasing
+    speak(m.text.replace(/\(.*?\)/g, "").trim());
+  }
+
+  // ---------------- Badges + Skins (progress saved) ----------------
+    const skins = [
+    { id:"mint",   name:"Mint",   color:"rgba(0,255,180,0.95)", trail:"rgba(0,255,180,0.55)" },
+    { id:"gold",   name:"Gold",   color:"rgba(255,215,0,0.95)", trail:"rgba(255,215,0,0.55)" },
+    { id:"cosmic", name:"Cosmic", color:"rgba(160,120,255,0.95)", trail:"rgba(160,120,255,0.55)" },
+    { id:"ruby",   name:"Ruby",   color:"rgba(255,80,120,0.95)", trail:"rgba(255,80,120,0.55)" },
+    { id:"ice",    name:"Ice",    color:"rgba(120,220,255,0.95)", trail:"rgba(120,220,255,0.55)" },
+    { id:"lime",   name:"Lime",   color:"rgba(180,255,80,0.95)", trail:"rgba(180,255,80,0.55)" },
+    { id:"sunset", name:"Sunset", color:"rgba(255,140,80,0.95)", trail:"rgba(255,140,80,0.55)" },
+    { id:"shadow", name:"Shadow", color:"rgba(210,210,220,0.92)", trail:"rgba(210,210,220,0.45)" }
+  ];
+
+  const badges = [
+    { id:"first_flight", title:"First Flight", desc:"You completed your first mission!" },
+    { id:"space_photographer", title:"Space Photographer", desc:"You took a space photo!" },
+    { id:"sample_collector", title:"Sample Collector", desc:"You collected your first planet sample!" },
+    { id:"sat_hero", title:"Satellite Hero", desc:"You rescued the lost satellite!" },
+    { id:"station_runner", title:"Station Runner", desc:"You delivered cargo to the Space Station!" },
+    { id:"space_legend", title:"Space Legend", desc:"You finished ALL missions!" }
+  ];
+
+  const defaultProgress = {
+    unlockedBadges: [],
+    unlockedSkins: ["mint"],
+    stats: { missionsDone: 0, bonks: 0, photos: 0, collects: 0, delivers: 0 }
+  };
+
+  function loadProgress() {
+    try {
+      const raw = localStorage.getItem(PROGRESS_KEY);
+      return raw ? { ...defaultProgress, ...JSON.parse(raw) } : { ...defaultProgress };
+    } catch {
+      return { ...defaultProgress };
+    }
+  }
+  function saveProgress() {
+    try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress)); } catch {}
+  }
+
+  const progress = loadProgress();
+
+  if (!progress.unlockedSkins.includes(settings.skinId)) { settings.skinId = 'mint'; saveSettings(); }
+  function currentSkin() {
+    return skins.find(s => s.id === settings.skinId) || skins[0];
+  }
+
+  function setSkin(id) {
+    if (!progress.unlockedSkins.includes(id)) return;
+    settings.skinId = id;
+    saveSettings();
+    updatePills();
+    showToast(`Skin changed: ${skins.find(s=>s.id===id)?.name ?? id}`, 1.4);
+    sfx.click();
+  }
+
+  function cycleSkin() {
+    const unlocked = skins.filter(s => progress.unlockedSkins.includes(s.id));
+    const idx = unlocked.findIndex(s => s.id === settings.skinId);
+    const next = unlocked[(idx + 1) % unlocked.length];
+    setSkin(next.id);
+  }
+
+  function unlockSkin(id, reasonText) {
+    if (progress.unlockedSkins.includes(id)) return;
+    progress.unlockedSkins.push(id);
+    saveProgress();
+    showBadgePopup("New Skin Unlocked!", reasonText + ` (${skins.find(s=>s.id===id)?.name ?? id})`, `Go to MAP and tap Skin to switch.`);
+    sfx.badge();
+  }
+
+  const badgePop = document.getElementById("badgePop");
+  let badgeTimer = 0;
+  function showBadgePopup(title, desc, small="") {
+    badgePop.innerHTML = `
+      <div class="bTitle">🏆 ${title}</div>
+      <div class="bDesc">${desc}</div>
+      ${small ? `<div class="bSmall">${small}</div>` : ""}
+    `;
+    badgePop.style.display = "block";
+    badgeTimer = 3.0;
+  }
+
+  function unlockBadge(id) {
+    if (progress.unlockedBadges.includes(id)) return;
+    progress.unlockedBadges.push(id);
+    saveProgress();
+    const b = badges.find(x => x.id === id);
+    if (b) showBadgePopup(b.title, b.desc, `Badges: ${progress.unlockedBadges.length}/${badges.length}`);
+    sfx.badge();
+  }
+
+  // ---------------- Simple trail particles for ship skins ----------------
+  const trail = [];
+  function spawnTrail() {
+    const sk = currentSkin();
+    // spawn behind movement direction
+    const backX = player.x - Math.cos(player.angle) * 22;
+    const backY = player.y - Math.sin(player.angle) * 22;
+    trail.push({
+      x: backX,
+      y: backY,
+      r: 6 + Math.random()*4,
+      life: 0.65 + Math.random()*0.25,
+      a: 0.55,
+      color: sk.trail
+    });
+    if (trail.length > 220) trail.splice(0, 40);
+  }
+
+  function updateTrail(dt) {
+    for (let i = trail.length - 1; i >= 0; i--) {
+      const p = trail[i];
+      p.life -= dt;
+      p.r *= Math.pow(0.94, dt*60);
+      p.a *= Math.pow(0.90, dt*60);
+      if (p.life <= 0 || p.a < 0.01) trail.splice(i, 1);
+    }
+  }
+
+  function renderTrail() {
+    for (const p of trail) {
+      const x = (p.x - camera.x) * DPR;
+      const y = (p.y - camera.y) * DPR;
+      ctx.globalAlpha = p.a;
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(x, y, p.r * DPR, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+    return dx*dx + dy*dy;
+  };
+
+  // ---------------- World ----------------
+  const world = { w: 8000, h: 5000 };
+
+  // Starfield
+  const stars = Array.from({length: 900}, () => ({
+    x: Math.random() * world.w,
+    y: Math.random() * world.h,
+    r: Math.random() * 1.6 + 0.2,
+    a: Math.random() * 0.8 + 0.2
+  }));
+
+  // ---------------- Player (your son) ----------------
+  const sonImg = new Image();
+  // (Character image not used anymore; player is a spaceship)
+  let sonReady = false;
+
+  const player = {
+    x: world.w * 0.15,
+    y: world.h * 0.55,
+    vx: 0, vy: 0,
+    angle: 0,
+    size: 72,          // bigger for kids
+    baseAccel: 760,    // tuned for tablet
+    baseMaxSpeed: 520,
+    friction: 0.987,   // gentle space drift
+    cargo: [],
+    photoTaken: false
+  };
+
+  // ---------------- Planets ----------------
+  const planets = [
+    { id:"mercury", name:"Mercury", x:1200, y:900,  r:55,  color:"#a6a6a6", hasSample:true, mass: 42000 },
+    { id:"venus",   name:"Venus",   x:2100, y:1400, r:85,  color:"#d4a24f", hasSample:true, mass: 82000 },
+    { id:"earth",   name:"Earth",   x:3200, y:2200, r:95,  color:"#3aa0ff", hasSample:true, base:true, mass: 90000 },
+    { id:"mars",    name:"Mars",    x:4300, y:1700, r:75,  color:"#d35a3a", hasSample:true, mass: 74000 },
+    { id:"jupiter", name:"Jupiter", x:5600, y:2500, r:170, color:"#d9b07e", hasSample:true, mass: 220000 },
+    { id:"saturn",  name:"Saturn",  x:6400, y:1300, r:160, color:"#e0d29a", hasSample:true, ring:true, mass: 190000 },
+    { id:"uranus",  name:"Uranus",  x:7100, y:3200, r:120, color:"#7bd7ff", hasSample:true, mass: 130000 },
+    { id:"neptune", name:"Neptune", x:7600, y:2100, r:120, color:"#436dff", hasSample:true, mass: 130000 }
+  ];
+
+  const spaceStation = { id:"station", name:"Space Station", x: 3600, y: 2850, r: 42 };
+
+  // Rescue satellite (mission target)
+  const satellite = { id:"sat", name:"Lost Satellite", x: 6000, y: 3400, r: 24, rescued:false };
+
+  function planetName(id) {
+    if (id === "station") return "Space Station";
+    if (id === "sat") return "Lost Satellite";
+    return planets.find(p => p.id === id)?.name || id;
+  }
+
+  // ---------------- Orbit / gravity physics (slingshot feel) ----------------
+  // Simple gravity wells per planet: a = GM / r^2 toward planet center.
+  // We cap it so it stays kid-friendly.
+  const G = 0.060;        // tuned constant
+  const gravMax = 520;    // cap acceleration
+
+  function applyGravity(dt) {
+    let ax = 0, ay = 0;
+
+    for (const p of planets) {
+      const dx = p.x - player.x;
+      const dy = p.y - player.y;
+      const r2 = dx*dx + dy*dy;
+      const minR = (p.r + 40);
+      const minR2 = minR*minR;
+      const safeR2 = Math.max(r2, minR2); // avoid singularity
+
+      // only apply within influence radius (keeps it manageable)
+      const influence = (p.r + 420);
+      if (safeR2 > influence*influence) continue;
+
+      const r = Math.sqrt(safeR2);
+      const a = clamp((G * p.mass) / safeR2, 0, gravMax);
+      ax += (dx / r) * a;
+      ay += (dy / r) * a;
+    }
+
+    player.vx += ax * dt;
+    player.vy += ay * dt;
+  }
+
+  // ---------------- Asteroids ----------------
+  // fewer + slower for age 5
+  const asteroids = Array.from({length: 70}, () => ({
+    x: Math.random() * world.w,
+    y: Math.random() * world.h,
+    r: Math.random() * 20 + 10,
+    vx: (Math.random() - 0.5) * 40,
+    vy: (Math.random() - 0.5) * 40
+  }));
+
+  // ---------------- Missions (more types) ----------------
+  // Types: VISIT, COLLECT, PHOTO, RESCUE, DELIVER
+  
+const missions = [
+  // Early easy missions
+  { type:"VISIT",   target:"mercury", done:false, text:"Fly to Mercury" },
+  { type:"VISIT",   target:"venus",   done:false, text:"Fly to Venus" },
+  { type:"PHOTO",   target:"venus",   done:false, text:"Take a photo of Venus clouds (Interact near Venus)" },
+
+  { type:"VISIT",   target:"earth",   done:false, text:"Fly to Earth" },
+  { type:"COLLECT", target:"earth",   done:false, text:"Collect an Earth sample (Interact near Earth)" },
+  { type:"DELIVER", target:"station", done:false, text:"Deliver your first sample to the Space Station (Interact there)" },
+
+  { type:"VISIT",   target:"mars",    done:false, text:"Fly to Mars" },
+  { type:"COLLECT", target:"mars",    done:false, text:"Collect a Mars sample (Interact near Mars)" },
+
+  // Big planets tour
+  { type:"VISIT",   target:"jupiter", done:false, text:"Fly to Jupiter" },
+  { type:"COLLECT", target:"jupiter", done:false, text:"Collect a Jupiter sample (Interact near Jupiter)" },
+
+  { type:"VISIT",   target:"saturn",  done:false, text:"Fly to Saturn" },
+  { type:"PHOTO",   target:"saturn",  done:false, text:"Take a photo of Saturn’s rings (Interact near Saturn)" },
+
+  { type:"VISIT",   target:"uranus",  done:false, text:"Fly to Uranus" },
+  { type:"COLLECT", target:"uranus",  done:false, text:"Collect a Uranus sample (Interact near Uranus)" },
+
+  { type:"VISIT",   target:"neptune", done:false, text:"Fly to Neptune" },
+  { type:"COLLECT", target:"neptune", done:false, text:"Collect a Neptune sample (Interact near Neptune)" },
+
+  // Space hero missions
+  { type:"RESCUE",  target:"sat",     done:false, text:"Rescue the Lost Satellite (fly to it + Interact)" },
+  { type:"DELIVER", target:"station", done:false, text:"Deliver satellite parts to the Space Station" },
+
+  // Final return
+  { type:"DELIVER", target:"earth",   done:false, text:"Return to Earth and deliver everything (Interact on Earth)" }
+];
+
+
+  function currentMission() {
+    return missions.find(m => !m.done) || null;
+  }
+  
+  
+
+
+  // ---------------- Free Play Mode ----------------
+  let freePlay = false;
+  let freeQuest = null; // {type, target, text}
+  let freeQuestJustSetAt = 0;
+
+  function allMissionsComplete() {
+    return !missions.find(m => !m.done);
+  }
+
+  function setFreeQuest(q) {
+    freeQuest = q;
+    freeQuestJustSetAt = performance.now();
+    // Announce quest
+    showToast(`Free Play: ${q.text}`, 2.0);
+    speak(q.text);
+  }
+
+  function randomPlanetId(excludeIds=[]) {
+    const ids = planets.map(p => p.id).filter(id => !excludeIds.includes(id));
+    return ids[Math.floor(Math.random() * ids.length)];
+  }
+
+  function ensureSamplesRespawn() {
+    // In Free Play, samples slowly come back so the kid always has something to do.
+    // (We just turn them back on when starting a new quest.)
+    for (const p of planets) {
+      if (!p.base) p.hasSample = true;
+    }
+  }
+
+  function nextFreeQuest() {
+    ensureSamplesRespawn();
+
+    const options = [
+      "VISIT",
+      "COLLECT",
+      "PHOTO",
+      "DELIVER_STATION",
+      "FIND_COMET",
+      "PICKUP_CRATE"
+    ];
+
+    const pick = options[Math.floor(Math.random() * options.length)];
+
+    if (pick === "VISIT") {
+      const id = randomPlanetId();
+      setWaypointToTarget(id);
+      setFreeQuest({ type:"VISIT", target:id, text:`Fly to ${planetName(id)}!` });
+      return;
+    }
+
+    if (pick === "COLLECT") {
+      const id = randomPlanetId(["earth"]);
+      setWaypointToTarget(id);
+      setFreeQuest({ type:"COLLECT", target:id, text:`Collect a sample from ${planetName(id)} (Interact)!` });
+      return;
+    }
+
+    if (pick === "PHOTO") {
+      const id = (Math.random() < 0.5) ? "saturn" : "venus";
+      setWaypointToTarget(id);
+      setFreeQuest({ type:"PHOTO", target:id, text:`Take a photo at ${planetName(id)} (Interact)!` });
+      return;
+    }
+
+    if (pick === "DELIVER_STATION") {
+      // If no cargo, give them cargo first
+      if (player.cargo.length === 0) {
+        const id = randomPlanetId(["earth"]);
+        setWaypointToTarget(id);
+        setFreeQuest({ type:"COLLECT", target:id, text:`Collect a sample from ${planetName(id)} (Interact)!` });
+        return;
+      }
+      setWaypointToTarget("station");
+      setFreeQuest({ type:"DELIVER", target:"station", text:"Deliver your cargo to the Space Station (Interact)!" });
+      return;
+    }
+
+    if (pick === "FIND_COMET") {
+      // reset comet so it can be found again
+      comet.found = false;
+      setWaypointToTarget("comet");
+      setFreeQuest({ type:"FIND", target:"comet", text:"Find the Friendly Comet (Interact)!" });
+      return;
+    }
+
+    if (pick === "PICKUP_CRATE") {
+      supplyCrate.taken = false;
+      // randomize crate location a bit
+      supplyCrate.x = 1800 + Math.random() * 4200;
+      supplyCrate.y = 800 + Math.random() * 3200;
+      setWaypointToTarget("crate");
+      setFreeQuest({ type:"PICKUP", target:"crate", text:"Pick up the Supply Crate (Interact)!" });
+      return;
+    }
+  }
+
+  function startFreePlay() {
+    if (freePlay) return;
+    freePlay = true;
+    showBadgePopup("Free Play Unlocked!", "Explore space and complete endless mini-missions!", "You can keep playing as long as you want.");
+    sfx.badge();
+    nextFreeQuest();
+  }
+
+  function currentMissionText() {
+    const m = currentMission();
+    if (m) return `Mission: ${m.text}`;
+    if (freePlay && freeQuest) return `Free Play: ${freeQuest.text}`;
+    if (allMissionsComplete()) return "All missions complete! Free Play is ready!";
+    return "Mission: (none)";
+  }
+
+function markMissionDone(type, target) {
+    const m = missions.find(mm => !mm.done && mm.type === type && mm.target === target);
+    if (m) {
+      m.done = true;
+      progress.stats.missionsDone += 1;
+      saveProgress();
+
+      // Badges / skins progression
+      if (progress.stats.missionsDone === 1) unlockBadge("first_flight");
+      if (progress.stats.missionsDone === 3) unlockSkin("gold", "Mission Master");
+      if (progress.stats.missionsDone === 6) unlockSkin("ruby", "Deep Space Driver");
+      if (progress.stats.missionsDone === 8) unlockSkin("ice", "Cool Commander");
+      if (progress.stats.missionsDone === 10) unlockSkin("lime", "Green Galaxy");
+      if (progress.stats.missionsDone === 12) unlockSkin("sunset", "Sunset Cruiser");
+
+      sfx.arrive();
+
+      // Speak next mission
+      const next = currentMission();
+      if (!next) {
+        unlockBadge("space_legend");
+        unlockSkin("cosmic", "Space Legend");
+        unlockSkin("shadow", "Space Legend");
+        speak("You did it! All missions complete!");
+        startFreePlay();
+      } else {
+        speakMission(next);
+      }
+    }
+  }
+// Waypoint (for map)
+  let waypoint = null; // {x,y,label,id}
+  function setWaypointToTarget(id) {
+    if (id === "station") waypoint = { x: spaceStation.x, y: spaceStation.y, id:"station", label:"Space Station" };
+    else if (id === "sat") waypoint = { x: satellite.x, y: satellite.y, id:"sat", label:"Lost Satellite" };
+    else {
+      const p = planets.find(pp => pp.id === id);
+      if (p) waypoint = { x: p.x, y: p.y, id: p.id, label: p.name };
+    }
+  }
+
+  // auto-set waypoint to current mission target (kid-friendly)
+  function autoWaypoint() {
+    if (freePlay) return;
+    const m = currentMission();
+    if (!m) return;
+    if (!waypoint || waypoint.id !== m.target) setWaypointToTarget(m.target);
+  }
+
+  // ---------------- UI elements ----------------
+  const hudMission = document.getElementById("missionLine");
+  const hudCargo = document.getElementById("cargoLine");
+  const hudWaypoint = document.getElementById("waypointLine");
+  const toastEl = document.getElementById("toast");
+
+
+
+  // ---------------- UI toggles (Sound / Voice / Skin) ----------------
+  const pillSound = document.getElementById("pillSound");
+  const pillVoice = document.getElementById("pillVoice");
+  const pillSkin  = document.getElementById("pillSkin");
+
+  function updatePills() {
+    pillSound.textContent = `Sound: ${settings.soundOn ? "On" : "Off"}`;
+    pillVoice.textContent = `Voice: ${settings.voiceOn ? "On" : "Off"}`;
+    pillSkin.textContent  = `Skin: ${currentSkin().name}`;
+  }
+  updatePills();
+
+  pillSound.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    settings.soundOn = !settings.soundOn;
+    saveSettings();
+    updatePills();
+    showToast(`Sound ${settings.soundOn ? "On" : "Off"}`, 1.2);
+    sfx.click();
+  });
+
+  pillVoice.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    settings.voiceOn = !settings.voiceOn;
+    saveSettings();
+    updatePills();
+    showToast(`Voice ${settings.voiceOn ? "On" : "Off"}`, 1.2);
+    sfx.click();
+  });
+
+  pillSkin.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+
+
+  // ---------------- Badge Collection Screen ----------------
+  const collectOverlay = document.getElementById("collectOverlay");
+  const btnBadges = document.getElementById("btnBadges");
+  const btnCloseCollect = document.getElementById("btnCloseCollect");
+  const badgeGrid = document.getElementById("badgeGrid");
+  const skinGrid = document.getElementById("skinGrid");
+  const collectSummary = document.getElementById("collectSummary");
+  const btnResetProgress = document.getElementById("btnResetProgress");
+
+  let collectOpen = false;
+
+  function openCollect() {
+    collectOpen = true;
+    collectOverlay.style.display = "block";
+    renderCollection();
+    sfx.click();
+  }
+  function closeCollect() {
+    collectOpen = false;
+    collectOverlay.style.display = "none";
+    sfx.click();
+  }
+  function toggleCollect() {
+    collectOpen ? closeCollect() : openCollect();
+  }
+
+  function renderCollection() {
+    collectSummary.textContent = `Badges: ${progress.unlockedBadges.length}/${badges.length} · Skins: ${progress.unlockedSkins.length}/${skins.length}`;
+
+    badgeGrid.innerHTML = "";
+    for (const b of badges) {
+      const unlocked = progress.unlockedBadges.includes(b.id);
+      const el = document.createElement("div");
+      el.className = "card" + (unlocked ? "" : " locked");
+      el.innerHTML = `
+        <div class="cTitle">${unlocked ? "🏆" : "🔒"} ${b.title}</div>
+        <div class="cDesc">${unlocked ? b.desc : "Keep playing to unlock this badge."}</div>
+      `;
+      badgeGrid.appendChild(el);
+    }
+
+    skinGrid.innerHTML = "";
+    for (const s of skins) {
+      const unlocked = progress.unlockedSkins.includes(s.id);
+      const active = settings.skinId === s.id;
+      const el = document.createElement("div");
+      el.className = "card" + (unlocked ? "" : " locked");
+      el.innerHTML = `
+        <div class="cTitle">${unlocked ? (active ? "✅" : "🎨") : "🔒"} ${s.name}</div>
+        <div class="cDesc">${unlocked ? "Tap to use this skin." : "Earn more badges/missions to unlock."}</div>
+      `;
+      el.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        if (!unlocked) { showToast("That skin is locked 🙂", 1.2); return; }
+        setSkin(s.id);
+        renderCollection();
+      });
+      skinGrid.appendChild(el);
+    }
+  }
+
+  btnBadges.addEventListener("pointerdown", (e) => { e.preventDefault(); toggleCollect(); });
+  btnCloseCollect.addEventListener("pointerdown", (e) => { e.preventDefault(); closeCollect(); });
+
+  btnResetProgress.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    sfx.click();
+    const ok = confirm("Reset progress? This will clear badges and skins on this device.");
+    if (!ok) return;
+    try {
+      localStorage.removeItem(PROGRESS_KEY);
+      localStorage.removeItem(SETTINGS_KEY);
+    } catch {}
+    location.reload();
+  });
+
+    cycleSkin();
+  });
+
+  let toast = { msg:"", t:0 };
+  function showToast(msg, seconds=2) {
+    toast.msg = msg;
+    toast.t = seconds;
+    toastEl.textContent = msg;
+    toastEl.style.display = "block";
+  }
+
+  function updateHud() {
+    const m = currentMission();
+    hudMission.textContent = currentMissionText();
+    hudCargo.textContent = `Cargo: ${player.cargo.length ? player.cargo.map(c=>c.name).join(", ") : "None"}  ·  Badges: ${progress.unlockedBadges.length}/${badges.length}`;
+    hudWaypoint.textContent = `Waypoint: ${waypoint ? waypoint.label : "None"}`;
+  }
+
+  // ---------------- Keyboard input (optional) ----------------
+  const keys = new Set();
+  addEventListener("keydown", (e) => {
+    if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," ","Shift","m","M","w","a","s","d","W","A","S","D"].includes(e.key)) e.preventDefault();
+    keys.add(e.key);
+
+    if (e.key === "m" || e.key === "M") toggleMap();
+    if (e.key === " ") tryInteract();
+  });
+  addEventListener("keyup", (e) => keys.delete(e.key));
+
+  // ---------------- Touch Joystick ----------------
+  const joyWrap = document.getElementById("joyWrap");
+  const joyBase = document.getElementById("joyBase");
+  const joyKnob = document.getElementById("joyKnob");
+
+  const joy = { active:false, id:null, cx:0, cy:0, dx:0, dy:0, max:60 };
+  function setKnob(dx, dy) {
+    const len = Math.hypot(dx, dy) || 1;
+    const k = len > joy.max ? (joy.max / len) : 1;
+    const nx = dx * k, ny = dy * k;
+    joyKnob.style.transform = `translate(calc(-50% + ${nx}px), calc(-50% + ${ny}px))`;
+    joy.dx = nx / joy.max;
+    joy.dy = ny / joy.max;
+  }
+  function resetKnob() {
+    joyKnob.style.transform = `translate(-50%, -50%)`;
+    joy.dx = 0; joy.dy = 0;
+  }
+
+  function getPosFromEvent(e) {
+    const t = e.changedTouches ? e.changedTouches[0] : e;
+    return { x: t.clientX, y: t.clientY, id: t.identifier ?? "mouse" };
+  }
+
+  joyWrap.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    const rect = joyBase.getBoundingClientRect();
+    joy.active = true;
+    joy.id = e.pointerId;
+    joy.cx = rect.left + rect.width/2;
+    joy.cy = rect.top + rect.height/2;
+    setKnob(e.clientX - joy.cx, e.clientY - joy.cy);
+    joyWrap.setPointerCapture(e.pointerId);
+  });
+
+  joyWrap.addEventListener("pointermove", (e) => {
+    if (!joy.active || e.pointerId !== joy.id) return;
+    e.preventDefault();
+    setKnob(e.clientX - joy.cx, e.clientY - joy.cy);
+  });
+
+  joyWrap.addEventListener("pointerup", (e) => {
+    if (e.pointerId !== joy.id) return;
+    e.preventDefault();
+    joy.active = false;
+    joy.id = null;
+    resetKnob();
+  });
+
+  joyWrap.addEventListener("pointercancel", () => {
+    joy.active = false;
+    joy.id = null;
+    resetKnob();
+  });
+
+  // ---------------- Buttons ----------------
+  const btnInteract = document.getElementById("btnInteract");
+  const btnBoost = document.getElementById("btnBoost");
+  const btnMap = document.getElementById("btnMap");
+  const btnCenter = document.getElementById("btnCenter");
+  const btnCloseMap = document.getElementById("btnCloseMap");
+
+  let boosting = false;
+
+  function bindHoldButton(btn, onDown, onUp) {
+    btn.addEventListener("pointerdown", (e) => { e.preventDefault(); onDown(); btn.setPointerCapture(e.pointerId); });
+    btn.addEventListener("pointerup", (e) => { e.preventDefault(); onUp(); });
+    btn.addEventListener("pointercancel", (e) => { e.preventDefault(); onUp(); });
+    btn.addEventListener("pointerleave", (e) => { if (e.pressure === 0) onUp(); });
+  }
+
+  btnInteract.addEventListener("pointerdown", (e) => { e.preventDefault(); sfx.click(); tryInteract(); });
+
+  bindHoldButton(btnBoost,
+    () => { boosting = true; sfx.boostOn(); },
+    () => { boosting = false; }
+  );
+
+  btnMap.addEventListener("pointerdown", (e) => { e.preventDefault(); sfx.click(); toggleMap(); });
+  btnCloseMap.addEventListener("pointerdown", (e) => { e.preventDefault(); sfx.click(); closeMap(); });
+  btnCenter.addEventListener("pointerdown", (e) => { e.preventDefault(); sfx.click(); camera.centerNow = true; showToast("Centered on ship", 1.2); });
+
+  // ---------------- Camera ----------------
+  const camera = { x: 0, y: 0, centerNow:false };
+
+  function centerCamera(w, h) {
+    camera.x = clamp(player.x - (w / DPR) * 0.5, 0, world.w - (w / DPR));
+    camera.y = clamp(player.y - (h / DPR) * 0.5, 0, world.h - (h / DPR));
+  }
+
+  // ---------------- Interactions ----------------
+  function nearestPlanetOrStation() {
+    let best = null;
+    let bestD2 = Infinity;
+
+    for (const p of planets) {
+      const d2v = dist2(player.x, player.y, p.x, p.y);
+      if (d2v < bestD2) { bestD2 = d2v; best = { kind:"planet", obj:p }; }
+    }
+    // station
+    const d2s = dist2(player.x, player.y, spaceStation.x, spaceStation.y);
+    if (d2s < bestD2) { bestD2 = d2s; best = { kind:"station", obj:spaceStation }; }
+
+    return { best, d2: bestD2 };
+  }
+
+  function tryInteract() {
+    const m = currentMission();
+    if (!m && !freePlay) { showToast("All missions complete! 🚀"); return; }
+    if (!m && freePlay && !freeQuest) { nextFreeQuest(); }
+
+
+
+    // Free Play quest handling
+    if (freePlay && freeQuest) {
+      const q = freeQuest;
+
+      if (q.type === "FIND") {
+        const rr = (comet.r + 90) * (comet.r + 90);
+        if (dist2(player.x, player.y, comet.x, comet.y) > rr) { showToast("Get closer to the comet!"); return; }
+        comet.found = true;
+        sfx.collect();
+        showToast("Comet found! ☄️✅", 1.4);
+        freeQuest = null;
+        nextFreeQuest();
+        return;
+      }
+
+      if (q.type === "PICKUP") {
+        const rr = (supplyCrate.r + 90) * (supplyCrate.r + 90);
+        if (dist2(player.x, player.y, supplyCrate.x, supplyCrate.y) > rr) { showToast("Get closer to the crate!"); return; }
+        if (!supplyCrate.taken) {
+          supplyCrate.taken = true;
+          player.cargo.push({ from:"crate", name:"Supplies" });
+          sfx.collect();
+          showToast("Supplies picked up! 📦✅", 1.4);
+        }
+        freeQuest = null;
+        nextFreeQuest();
+        return;
+      }
+
+      // For COLLECT / PHOTO / DELIVER, we fall through to the normal planet/station interaction,
+      // but when it succeeds we'll complete the quest.
+    }
+    // satellite rescue
+    if (m.type === "RESCUE") {
+      const rr = (satellite.r + 90) * (satellite.r + 90);
+      if (dist2(player.x, player.y, satellite.x, satellite.y) > rr) {
+        showToast("Get closer to the Lost Satellite!");
+        return;
+      }
+      if (!satellite.rescued) {
+        satellite.rescued = true;
+        player.cargo.push({ from:"sat", name:"Satellite Parts" });
+        unlockBadge("sat_hero"); sfx.collect(); showToast("Rescued the satellite! ✅");
+} else {
+        showToast("Satellite already rescued ✅");
+      }
+      markMissionDone("RESCUE", "sat");
+      return;
+    }
+
+    // planet/station interactions
+    const { best, d2 } = nearestPlanetOrStation();
+    if (!best) return;
+
+    const obj = best.obj;
+    const radius = (best.kind === "planet") ? obj.r : obj.r;
+    const interactRange = (radius + 105) * (radius + 105);
+
+    if (d2 > interactRange) { showToast("Get closer to interact."); return; }
+
+    // Mission types
+    if (m.type === "COLLECT") {
+      if (best.kind !== "planet" || obj.id !== m.target) {
+        showToast(`This mission wants ${planetName(m.target)}.`);
+        return;
+      }
+      if (!obj.hasSample) {
+        showToast(`${obj.name} has no samples left.`);
+        markMissionDone("COLLECT", obj.id);
+        return;
+      }
+      obj.hasSample = false;
+      player.cargo.push({ from: obj.id, name: `${obj.name} Sample` });
+      progress.stats.collects += 1; saveProgress(); if (progress.stats.collects === 1) unlockBadge("sample_collector"); sfx.collect();
+      showToast(`Collected: ${obj.name} Sample ✅`);
+      if (freePlay && freeQuest && freeQuest.type==="COLLECT" && freeQuest.target===obj.id) { freeQuest = null; nextFreeQuest(); return; }
+      markMissionDone("COLLECT", obj.id);
+      return;
+    }
+
+    if (m.type === "PHOTO") {
+      if (best.kind !== "planet" || obj.id !== m.target) {
+        showToast(`Take the photo at ${planetName(m.target)}.`);
+        return;
+      }
+      if (obj.id === "saturn") {
+        player.photoTaken = true;
+        progress.stats.photos += 1; saveProgress(); if (progress.stats.photos === 1) unlockBadge("space_photographer"); unlockSkin("cosmic", "Space Photographer"); sfx.photo();
+        player.cargo.push({ from:"saturn", name:"Saturn Ring Photo" });
+        showToast("Photo taken! 📸✅");
+        if (freePlay && freeQuest && freeQuest.type==="PHOTO" && freeQuest.target==="saturn") { freeQuest = null; nextFreeQuest(); return; }
+        markMissionDone("PHOTO", "saturn");
+        return;
+      }
+      showToast("Not the right planet for the photo.");
+      return;
+    }
+
+    if (m.type === "DELIVER") {
+      if (m.target === "station") {
+        if (best.kind !== "station") { showToast("Deliver at the Space Station."); return; }
+        if (player.cargo.length === 0) { showToast("Nothing to deliver yet."); return; }
+        const count = player.cargo.length;
+        player.cargo = [];
+        progress.stats.delivers += 1; saveProgress(); unlockBadge("station_runner"); sfx.deliver();
+        showToast(`Delivered ${count} item(s) to the Station! 🎉`);
+        if (freePlay && freeQuest && freeQuest.type==="DELIVER" && freeQuest.target==="station") { freeQuest = null; nextFreeQuest(); return; }
+        markMissionDone("DELIVER", "station");
+        return;
+      }
+      if (m.target === "earth") {
+        if (best.kind !== "planet" || obj.id !== "earth") { showToast("Deliver on Earth."); return; }
+        if (player.cargo.length === 0) { showToast("No samples to deliver yet."); return; }
+        const count = player.cargo.length;
+        player.cargo = [];
+        progress.stats.delivers += 1; saveProgress(); sfx.deliver();
+        showToast(`Delivered ${count} item(s) to Earth! 🌍🎉`);
+        if (freePlay && freeQuest && freeQuest.type==="DELIVER" && freeQuest.target==="earth") { freeQuest = null; nextFreeQuest(); return; }
+        markMissionDone("DELIVER", "earth");
+        return;
+      }
+    }
+
+    showToast("Nice flying! 🚀");
+  }
+
+  // VISIT completes on proximity
+  
+  function checkVisitMission() {
+    const m = currentMission();
+    if (!freePlay && (!m || m.type !== "VISIT")) return;
+
+    // Free Play VISIT quest
+    if (freePlay && freeQuest && freeQuest.type === "VISIT") {
+      const pid = freeQuest.target;
+      const p = planets.find(pp => pp.id === pid);
+      if (p) {
+        const rr = (p.r + 140) * (p.r + 140);
+        if (dist2(player.x, player.y, p.x, p.y) < rr) {
+          sfx.arrive();
+          showToast("Nice! Quest complete ✅", 1.4);
+          freeQuest = null;
+          nextFreeQuest();
+        }
+      }
+      return;
+    }
+
+    if (!m || m.type !== "VISIT") return;
+
+    if (m.target === "station") {
+      const rr = (spaceStation.r + 140) * (spaceStation.r + 140);
+      if (dist2(player.x, player.y, spaceStation.x, spaceStation.y) < rr) {
+        markMissionDone("VISIT","station");
+        showToast("Arrived at Space Station ✅");
+      }
+      return;
+    }
+    if (m.target === "sat") {
+      const rr = (satellite.r + 140) * (satellite.r + 140);
+      if (dist2(player.x, player.y, satellite.x, satellite.y) < rr) {
+        markMissionDone("VISIT","sat");
+        showToast("Found the Lost Satellite ✅");
+      }
+      return;
+    }
+
+    const p = planets.find(pp => pp.id === m.target);
+    if (!p) return;
+    const rr = (p.r + 140) * (p.r + 140);
+    if (dist2(player.x, player.y, p.x, p.y) < rr) {
+      markMissionDone("VISIT", p.id);
+      showToast(`Arrived at ${p.name} ✅`);
+    }
+  }
+
+
+  // ---------------- Map Overlay ----------------
+  let mapOpen = false;
+  function openMap() {
+    mapOpen = true;
+    mapOverlay.style.display = "block";
+    resizeMap();
+    drawMap();
+  }
+  function closeMap() {
+    mapOpen = false;
+    mapOverlay.style.display = "none";
+  }
+  function toggleMap() {
+    mapOpen ? closeMap() : openMap();
+  }
+
+  function worldToMap(x, y) {
+    const w = mapCanvas.width, h = mapCanvas.height;
+    const pad = 40 * DPR;
+    const sx = (w - pad*2) / world.w;
+    const sy = (h - pad*2) / world.h;
+    const s = Math.min(sx, sy);
+    return { x: pad + x * s, y: pad + y * s, s, pad };
+  }
+
+
+
+  function drawShipIcon(g, x, y, angleRad, size, boosting) {
+    const sk = currentSkin();
+    g.save();
+    g.translate(x, y);
+    g.rotate(angleRad);
+
+    // Ship body (triangle)
+    g.fillStyle = sk.color;
+    g.beginPath();
+    g.moveTo(size, 0);
+    g.lineTo(-size * 0.8, size * 0.55);
+    g.lineTo(-size * 0.8, -size * 0.55);
+    g.closePath();
+    g.fill();
+
+    // Window
+    g.fillStyle = "rgba(255,255,255,0.85)";
+    g.beginPath();
+    g.arc(size * 0.2, 0, size * 0.18, 0, Math.PI * 2);
+    g.fill();
+
+    // Flame if boosting
+    if (boosting) {
+      g.fillStyle = "rgba(255,215,0,0.90)";
+      g.beginPath();
+      g.moveTo(-size * 0.8, 0);
+      g.lineTo(-size * 1.25, size * 0.25);
+      g.lineTo(-size * 1.25, -size * 0.25);
+      g.closePath();
+      g.fill();
+    }
+
+
+  function drawWaypointIconWorld(g, x, y, angleRad, size) {
+    // A little flag + star, rotated to point toward the waypoint
+    g.save();
+    g.translate(x, y);
+    g.rotate(angleRad);
+
+    // pole
+    g.strokeStyle = "rgba(255,255,255,0.65)";
+    g.lineWidth = 2 * DPR;
+    g.beginPath();
+    g.moveTo(-size * 0.2, -size * 0.9);
+    g.lineTo(-size * 0.2, size * 0.9);
+    g.stroke();
+
+    // flag
+    g.fillStyle = "rgba(255,215,0,0.92)";
+    g.beginPath();
+    g.moveTo(-size * 0.2, -size * 0.6);
+    g.lineTo(size * 0.9, -size * 0.35);
+    g.lineTo(-size * 0.2, -size * 0.1);
+    g.closePath();
+    g.fill();
+
+    // star
+    g.fillStyle = "rgba(255,215,0,0.95)";
+    g.font = `${14 * DPR}px system-ui`;
+    g.fillText("★", size * 1.05, 6 * DPR);
+
+    g.restore();
+  }
+
+  function drawWaypointIconMap(g, x, y) {
+    // Compact target marker for map
+    g.save();
+    g.translate(x, y);
+
+    // glow
+    g.globalAlpha = 0.35;
+    g.fillStyle = "rgba(255,215,0,0.75)";
+    g.beginPath();
+    g.arc(0, 0, 14 * DPR, 0, Math.PI * 2);
+    g.fill();
+    g.globalAlpha = 1;
+
+    // pole
+    g.strokeStyle = "rgba(255,255,255,0.75)";
+    g.lineWidth = 2 * DPR;
+    g.beginPath();
+    g.moveTo(-6 * DPR, -14 * DPR);
+    g.lineTo(-6 * DPR, 14 * DPR);
+    g.stroke();
+
+    // flag
+    g.fillStyle = "rgba(255,215,0,0.95)";
+    g.beginPath();
+    g.moveTo(-6 * DPR, -12 * DPR);
+    g.lineTo(10 * DPR, -6 * DPR);
+    g.lineTo(-6 * DPR, 0);
+    g.closePath();
+    g.fill();
+
+    // center dot
+    g.fillStyle = "rgba(255,255,255,0.9)";
+    g.beginPath();
+    g.arc(0, 0, 3.5 * DPR, 0, Math.PI * 2);
+    g.fill();
+
+    g.restore();
+  }
+
+    g.restore();
+  }
+
+  function drawMap() {
+    const w = mapCanvas.width, h = mapCanvas.height;
+    mapCtx.clearRect(0,0,w,h);
+
+    // background
+    const g = mapCtx.createLinearGradient(0,0,0,h);
+    g.addColorStop(0, "rgba(10,12,24,0.95)");
+    g.addColorStop(1, "rgba(3,4,10,0.95)");
+    mapCtx.fillStyle = g;
+    mapCtx.fillRect(0,0,w,h);
+
+    // stars
+    mapCtx.globalAlpha = 0.35;
+    for (let i=0;i<300;i++){
+      const x = Math.random()*w, y = Math.random()*h;
+      mapCtx.fillStyle = "white";
+      mapCtx.fillRect(x,y, 1*DPR, 1*DPR);
+    }
+    mapCtx.globalAlpha = 1;
+
+    // planets
+    for (const p of planets) {
+      const mp = worldToMap(p.x, p.y);
+      mapCtx.fillStyle = p.color;
+      mapCtx.beginPath();
+      mapCtx.arc(mp.x, mp.y, Math.max(6*DPR, p.r * mp.s * 0.12), 0, Math.PI*2);
+      mapCtx.fill();
+
+      mapCtx.fillStyle = "rgba(255,255,255,0.85)";
+      mapCtx.font = `${12*DPR}px system-ui`;
+      mapCtx.fillText(p.name, mp.x + 10*DPR, mp.y - 10*DPR);
+    }
+
+    // station
+    {
+      const ms = worldToMap(spaceStation.x, spaceStation.y);
+      mapCtx.fillStyle = "rgba(255,255,255,0.85)";
+      mapCtx.beginPath();
+      mapCtx.rect(ms.x-6*DPR, ms.y-6*DPR, 12*DPR, 12*DPR);
+      mapCtx.fill();
+      mapCtx.fillStyle = "rgba(255,255,255,0.85)";
+      mapCtx.font = `${12*DPR}px system-ui`;
+      mapCtx.fillText("Station", ms.x + 10*DPR, ms.y - 10*DPR);
+    }
+
+    // satellite
+    if (!satellite.rescued) {
+      const msat = worldToMap(satellite.x, satellite.y);
+      mapCtx.strokeStyle = "rgba(255,255,255,0.85)";
+      mapCtx.lineWidth = 2*DPR;
+      mapCtx.beginPath();
+      mapCtx.arc(msat.x, msat.y, 8*DPR, 0, Math.PI*2);
+      mapCtx.stroke();
+      mapCtx.font = `${12*DPR}px system-ui`;
+      mapCtx.fillStyle = "rgba(255,255,255,0.85)";
+      mapCtx.fillText("Satellite", msat.x + 10*DPR, msat.y - 10*DPR);
+    }
+
+    // player marker as spaceship
+    const me = worldToMap(player.x, player.y);
+    drawShipIcon(mapCtx, me.x, me.y, player.angle, 10 * DPR, boosting);
+// waypoint marker (flag)
+    if (waypoint) {
+      const wp = worldToMap(waypoint.x, waypoint.y);
+      drawWaypointIconMap(mapCtx, wp.x, wp.y);
+    }
+}
+
+  // Tap on map to set waypoint
+  mapCanvas.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    const rect = mapCanvas.getBoundingClientRect();
+    const mx = (e.clientX - rect.left) * DPR;
+    const my = (e.clientY - rect.top) * DPR;
+
+    // find nearest target in map space
+    const allTargets = [
+      ...planets.map(p => ({ id:p.id, name:p.name, x:p.x, y:p.y, kind:"planet" })),
+      { id:"station", name:"Space Station", x:spaceStation.x, y:spaceStation.y, kind:"station" },
+      ...(!satellite.rescued ? [{ id:"sat", name:"Lost Satellite", x:satellite.x, y:satellite.y, kind:"sat" }] : [])
+    ];
+
+    let best = null, bestD2 = Infinity;
+    for (const t of allTargets) {
+      const mp = worldToMap(t.x, t.y);
+      const d2v = (mp.x - mx)*(mp.x - mx) + (mp.y - my)*(mp.y - my);
+      if (d2v < bestD2) { bestD2 = d2v; best = t; }
+    }
+
+    if (best && bestD2 < (40*DPR)*(40*DPR)) {
+      setWaypointToTarget(best.id);
+      sfx.click();
+      showToast(`Waypoint set: ${best.name}`, 1.6);
+      drawMap();
+      updateHud();
+    } else {
+      showToast("Tap closer to a planet icon 🙂", 1.4);
+    }
+  });
+
+  // ---------------- Update loop ----------------
+  function update(dt) {
+    // Keep waypoint aligned to current mission unless player set it manually
+    autoWaypoint();
+
+
+
+    // Auto-start Free Play once missions are complete (after first tap so audio/voice is allowed)
+    if (!freePlay && allMissionsComplete() && userInteracted) {
+      startFreePlay();
+    }
+
+    // Gravity (orbit/slingshot)
+    applyGravity(dt);
+
+    // Controls: joystick + keyboard fallback
+    const kbUp    = keys.has("ArrowUp") || keys.has("w") || keys.has("W");
+    const kbDown  = keys.has("ArrowDown") || keys.has("s") || keys.has("S");
+    const kbLeft  = keys.has("ArrowLeft") || keys.has("a") || keys.has("A");
+    const kbRight = keys.has("ArrowRight") || keys.has("d") || keys.has("D");
+    const kbBoost = keys.has("Shift");
+
+    let ax = joy.dx;
+    let ay = joy.dy;
+
+    if (!joy.active) {
+      ax = (kbRight ? 1 : 0) - (kbLeft ? 1 : 0);
+      ay = (kbDown ? 1 : 0) - (kbUp ? 1 : 0);
+      const len = Math.hypot(ax, ay) || 1;
+      ax /= len; ay /= len;
+    }
+
+    const boost = boosting || kbBoost;
+    const accel = player.baseAccel * (boost ? 1.55 : 1.0);
+    player.vx += ax * accel * dt;
+    player.vy += ay * accel * dt;
+
+    // gentle friction
+    player.vx *= Math.pow(player.friction, dt * 60);
+    player.vy *= Math.pow(player.friction, dt * 60);
+
+    // clamp speed
+    const speed = Math.hypot(player.vx, player.vy);
+    const maxS = player.baseMaxSpeed * (boost ? 1.18 : 1.0);
+    if (speed > maxS) {
+      const s = maxS / speed;
+      player.vx *= s; player.vy *= s;
+    }
+
+    player.x += player.vx * dt;
+    player.y += player.vy * dt;
+
+    // World bounds
+    player.x = clamp(player.x, 0, world.w);
+    player.y = clamp(player.y, 0, world.h);
+
+    // Angle
+    if (Math.abs(player.vx) + Math.abs(player.vy) > 0.5) player.angle = Math.atan2(player.vy, player.vx);
+
+
+    // Trail particles (skins)
+    if (speed > 35) spawnTrail();
+    updateTrail(dt);
+    // Asteroids drift + gentle bump
+    for (const a of asteroids) {
+      a.x += a.vx * dt;
+      a.y += a.vy * dt;
+
+      if (a.x < -200) a.x = world.w + 200;
+      if (a.x > world.w + 200) a.x = -200;
+      if (a.y < -200) a.y = world.h + 200;
+      if (a.y > world.h + 200) a.y = -200;
+
+      const rr = (a.r + 34) * (a.r + 34);
+      if (dist2(player.x, player.y, a.x, a.y) < rr) {
+        const dx = player.x - a.x, dy = player.y - a.y;
+        const d = Math.hypot(dx, dy) || 1;
+        player.vx += (dx / d) * 220;
+        player.vy += (dy / d) * 220;
+        progress.stats.bonks += 1; saveProgress(); sfx.bonk(); showToast("Bonk! ☄️", 1.0);
+}
+    }
+
+    // Visit mission check
+    checkVisitMission();
+
+    // Toast timer
+    if (toast.t > 0) {
+      toast.t -= dt;
+      if (toast.t <= 0) toastEl.style.display = "none";
+    }
+
+    // Badge popup timer
+    if (badgeTimer > 0) {
+      badgeTimer -= dt;
+      if (badgeTimer <= 0) badgePop.style.display = "none";
+    }
+updateHud();
+
+    // Camera
+    const w = canvas.width, h = canvas.height;
+    if (camera.centerNow) {
+      centerCamera(w, h);
+      camera.centerNow = false;
+    } else {
+      // smooth follow
+      const targetX = clamp(player.x - (w / DPR) * 0.5, 0, world.w - (w / DPR));
+      const targetY = clamp(player.y - (h / DPR) * 0.5, 0, world.h - (h / DPR));
+      camera.x += (targetX - camera.x) * (1 - Math.pow(0.002, dt * 60));
+      camera.y += (targetY - camera.y) * (1 - Math.pow(0.002, dt * 60));
+    }
+
+    // Map redraw while open
+    if (mapOpen) drawMap();
+  }
+
+  // ---------------- Render ----------------
+  function render() {
+    const w = canvas.width, h = canvas.height;
+
+    // Background gradient
+    const g = ctx.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, "#05060a");
+    g.addColorStop(1, "#070a14");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+
+    // Stars (parallax)
+    for (const s of stars) {
+      const sx = (s.x - camera.x * 0.35) * DPR;
+      const sy = (s.y - camera.y * 0.35) * DPR;
+      if (sx < -10 || sy < -10 || sx > w + 10 || sy > h + 10) continue;
+      ctx.globalAlpha = s.a;
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.arc(sx, sy, s.r * DPR, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // Skin trail
+    renderTrail();
+
+    // Asteroids
+    ctx.fillStyle = "rgba(255,255,255,0.10)";
+    for (const a of asteroids) {
+      const x = (a.x - camera.x) * DPR;
+      const y = (a.y - camera.y) * DPR;
+      if (x < -200 || y < -200 || x > w + 200 || y > h + 200) continue;
+      ctx.beginPath();
+      ctx.arc(x, y, a.r * DPR, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Waypoint marker (flag icon)
+    if (waypoint) {
+      const px = (player.x - camera.x) * DPR;
+      const py = (player.y - camera.y) * DPR;
+      const wx = (waypoint.x - camera.x) * DPR;
+      const wy = (waypoint.y - camera.y) * DPR;
+      const dx = wx - px, dy = wy - py;
+      const d = Math.hypot(dx, dy);
+      if (d > 30 * DPR) {
+        const ang = Math.atan2(dy, dx);
+        const ux = dx / d, uy = dy / d;
+        const ax = px + ux * 95 * DPR;
+        const ay = py + uy * 95 * DPR;
+        drawWaypointIconWorld(ctx, ax, ay, ang, 16 * DPR);
+      }
+    }
+
+    // Planets
+    for (const p of planets) {
+      const x = (p.x - camera.x) * DPR;
+      const y = (p.y - camera.y) * DPR;
+      if (x < -400 || y < -400 || x > w + 400 || y > h + 400) continue;
+
+      // glow
+      ctx.globalAlpha = 0.22;
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(x, y, (p.r + 20) * DPR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+
+      // planet body
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(x, y, p.r * DPR, 0, Math.PI * 2);
+      ctx.fill();
+
+      // saturn ring
+      if (p.ring) {
+        ctx.strokeStyle = "rgba(255,255,255,0.35)";
+        ctx.lineWidth = 6 * DPR;
+        ctx.beginPath();
+        ctx.ellipse(x, y, (p.r + 50) * DPR, (p.r + 22) * DPR, -0.2, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // sample marker
+      if (p.hasSample && !p.base) {
+        ctx.fillStyle = "rgba(255,255,255,0.85)";
+        ctx.font = `${16 * DPR}px system-ui`;
+        ctx.fillText("★", x + (p.r + 10) * DPR, y - (p.r + 10) * DPR);
+      }
+
+      // labels
+      ctx.fillStyle = "rgba(255,255,255,0.75)";
+      ctx.font = `${14 * DPR}px system-ui`;
+      ctx.fillText(p.name, x - (p.r * 0.55) * DPR, y + (p.r + 28) * DPR);
+    }
+
+    // Space Station
+    {
+      const x = (spaceStation.x - camera.x) * DPR;
+      const y = (spaceStation.y - camera.y) * DPR;
+      ctx.fillStyle = "rgba(255,255,255,0.9)";
+      ctx.beginPath();
+      ctx.roundRect(x - 22*DPR, y - 10*DPR, 44*DPR, 20*DPR, 6*DPR);
+      ctx.fill();
+      ctx.fillStyle = "rgba(0,0,0,0.6)";
+      ctx.fillRect(x - 14*DPR, y - 4*DPR, 28*DPR, 8*DPR);
+      ctx.fillStyle = "rgba(255,255,255,0.75)";
+      ctx.font = `${14*DPR}px system-ui`;
+      ctx.fillText("Station", x - 24*DPR, y + 34*DPR);
+    }
+
+    // Satellite (if not rescued)
+    if (!satellite.rescued) {
+      const x = (satellite.x - camera.x) * DPR;
+      const y = (satellite.y - camera.y) * DPR;
+      ctx.strokeStyle = "rgba(255,255,255,0.85)";
+      ctx.lineWidth = 3*DPR;
+      ctx.beginPath();
+      ctx.moveTo(x - 18*DPR, y); ctx.lineTo(x + 18*DPR, y);
+      ctx.moveTo(x, y - 10*DPR); ctx.lineTo(x, y + 10*DPR);
+      ctx.stroke();
+      ctx.fillStyle = "rgba(255,255,255,0.75)";
+      ctx.font = `${14*DPR}px system-ui`;
+      ctx.fillText("Satellite", x - 30*DPR, y + 32*DPR);
+    }
+
+    // Player
+    const px = (player.x - camera.x) * DPR;
+    const py = (player.y - camera.y) * DPR;
+
+    // Direction indicator
+    ctx.strokeStyle = "rgba(255,255,255,0.35)";
+    ctx.lineWidth = 2 * DPR;
+    ctx.beginPath();
+    ctx.moveTo(px, py);
+    ctx.lineTo(px + Math.cos(player.angle) * 42 * DPR, py + Math.sin(player.angle) * 42 * DPR);
+    ctx.stroke();
+
+    
+    // Draw player spaceship (skin) instead of image
+    {
+      const sk = currentSkin();
+      ctx.save();
+      ctx.translate(px, py);
+      ctx.rotate(player.angle);
+
+      // soft shadow
+      ctx.shadowColor = "rgba(0,0,0,0.45)";
+      ctx.shadowBlur = 18 * DPR;
+
+      // body
+      ctx.fillStyle = sk.color;
+      ctx.beginPath();
+      ctx.moveTo(34 * DPR, 0);
+      ctx.lineTo(-22 * DPR, 18 * DPR);
+      ctx.lineTo(-16 * DPR, 0);
+      ctx.lineTo(-22 * DPR, -18 * DPR);
+      ctx.closePath();
+      ctx.fill();
+
+      // fin
+      ctx.globalAlpha = 0.9;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(-24 * DPR, 8 * DPR);
+      ctx.lineTo(-24 * DPR, -8 * DPR);
+      ctx.closePath();
+      ctx.fill();
+      ctx.globalAlpha = 1;
+
+      // window
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      ctx.beginPath();
+      ctx.arc(10 * DPR, 0, 6 * DPR, 0, Math.PI * 2);
+      ctx.fill();
+
+      // flame when boosting
+      if (boosting || keys.has("Shift")) {
+        ctx.fillStyle = "rgba(255,215,0,0.90)";
+        ctx.beginPath();
+        ctx.moveTo(-22 * DPR, 0);
+        ctx.lineTo(-44 * DPR, 10 * DPR);
+        ctx.lineTo(-44 * DPR, -10 * DPR);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      ctx.restore();
+    }
+  }
+
+  // ---------------- Main loop ----------------
+  last = performance.now();
+  function loop(now) {
+    const dt = Math.min(0.033, (now - last) / 1000);
+    last = now;
+    update(dt);
+    render();
+    requestAnimationFrame(loop);
+  }
+
+  // First toast + waypoint
+  showToast("Welcome, Space Explorer! Use the joystick to fly 🚀", 2.2);
+  updateHud();
+  // Speak the first mission (after first interaction on mobile)
+  setTimeout(() => { speakMission(currentMission()); }, 250);
+  requestAnimationFrame(loop);
+
+})();
+</script>
+</body>
+</html>
