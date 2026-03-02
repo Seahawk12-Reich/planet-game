@@ -225,7 +225,7 @@
 </style>
 </head>
 <body>
-<canvas id="c"></canvas>
+<canvas id="c" tabindex="0"></canvas>
 
 <div class="ui" id="ui">
   <div class="hud" id="hud">
@@ -300,27 +300,6 @@
   // ---------------- Canvas setup ----------------
   const canvas = document.getElementById("c");
   const ctx = canvas.getContext("2d");
-
-
-  // ---------------- Canvas polyfills (older Android WebView/Chrome) ----------------
-  if (typeof CanvasRenderingContext2D !== "undefined" && !CanvasRenderingContext2D.prototype.roundRect) {
-    CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
-      if (Array.isArray(r)) r = r[0] ?? 0;
-      r = Math.max(0, Math.min(r || 0, Math.min(w, h) / 2));
-      this.beginPath();
-      this.moveTo(x + r, y);
-      this.lineTo(x + w - r, y);
-      this.arcTo(x + w, y, x + w, y + r, r);
-      this.lineTo(x + w, y + h - r);
-      this.arcTo(x + w, y + h, x + w - r, y + h, r);
-      this.lineTo(x + r, y + h);
-      this.arcTo(x, y + h, x, y + h - r, r);
-      this.lineTo(x, y + r);
-      this.arcTo(x, y, x + r, y, r);
-      this.closePath();
-      return this;
-    };
-  }
 
   const DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
   function resize() {
@@ -1025,14 +1004,47 @@ function markMissionDone(type, target) {
 
   // ---------------- Keyboard input (optional) ----------------
   const keys = new Set();
-  addEventListener("keydown", (e) => {
-    if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," ","Shift","m","M","w","a","s","d","W","A","S","D"].includes(e.key)) e.preventDefault();
-    keys.add(e.key);
 
-    if (e.key === "m" || e.key === "M") toggleMap();
-    if (e.key === " ") tryInteract();
-  });
-  addEventListener("keyup", (e) => keys.delete(e.key));
+  function keyName(e) {
+    // Use both e.key and e.code so WASD works across keyboards/devices.
+    // Normalize to a small set used by update().
+    const k = e.key;
+    const c = e.code;
+    if (c === "KeyW" || k === "w" || k === "W") return "w";
+    if (c === "KeyA" || k === "a" || k === "A") return "a";
+    if (c === "KeyS" || k === "s" || k === "S") return "s";
+    if (c === "KeyD" || k === "d" || k === "D") return "d";
+    if (c === "ArrowUp"   || k === "ArrowUp") return "ArrowUp";
+    if (c === "ArrowDown" || k === "ArrowDown") return "ArrowDown";
+    if (c === "ArrowLeft" || k === "ArrowLeft") return "ArrowLeft";
+    if (c === "ArrowRight"|| k === "ArrowRight") return "ArrowRight";
+    if (c === "ShiftLeft" || c === "ShiftRight" || k === "Shift") return "Shift";
+    if (c === "Space" || k === " ") return "Space";
+    if (c === "KeyM" || k === "m" || k === "M") return "m";
+    return null;
+  }
+
+  function onKeyDown(e) {
+    const k = keyName(e);
+    if (!k) return;
+    e.preventDefault();
+    keys.add(k);
+
+    if (k === "m") toggleMap();
+    if (k === "Space") tryInteract();
+  }
+  function onKeyUp(e) {
+    const k = keyName(e);
+    if (!k) return;
+    e.preventDefault();
+    keys.delete(k);
+  }
+
+  window.addEventListener("keydown", onKeyDown, { passive:false });
+  window.addEventListener("keyup", onKeyUp, { passive:false });
+
+  // Make sure the canvas can receive focus so keyboards work reliably.
+  canvas.addEventListener("pointerdown", () => canvas.focus());
 
   // ---------------- Touch Joystick ----------------
   const joyWrap = document.getElementById("joyWrap");
@@ -1382,8 +1394,7 @@ function markMissionDone(type, target) {
       g.closePath();
       g.fill();
     }
-    g.restore();
-  }
+
 
   function drawWaypointIconWorld(g, x, y, angleRad, size) {
     // A little flag + star, rotated to point toward the waypoint
@@ -1451,6 +1462,9 @@ function markMissionDone(type, target) {
     g.beginPath();
     g.arc(0, 0, 3.5 * DPR, 0, Math.PI * 2);
     g.fill();
+
+    g.restore();
+  }
 
     g.restore();
   }
@@ -1571,10 +1585,10 @@ function markMissionDone(type, target) {
     applyGravity(dt);
 
     // Controls: joystick + keyboard fallback
-    const kbUp    = keys.has("ArrowUp") || keys.has("w") || keys.has("W");
-    const kbDown  = keys.has("ArrowDown") || keys.has("s") || keys.has("S");
-    const kbLeft  = keys.has("ArrowLeft") || keys.has("a") || keys.has("A");
-    const kbRight = keys.has("ArrowRight") || keys.has("d") || keys.has("D");
+    const kbUp    = keys.has("ArrowUp") || keys.has("w");
+    const kbDown  = keys.has("ArrowDown") || keys.has("s");
+    const kbLeft  = keys.has("ArrowLeft") || keys.has("a");
+    const kbRight = keys.has("ArrowRight") || keys.has("d");
     const kbBoost = keys.has("Shift");
 
     let ax = joy.dx;
@@ -1871,40 +1885,15 @@ updateHud();
     last = now;
     update(dt);
     render();
-    requestAnimationFrame(safeLoop);
+    requestAnimationFrame(loop);
   }
-
-  // Crash guard: if something throws during update/render, show an on-screen message (instead of a blank screen)
-  function safeLoop(ts) {
-    try {
-      loop(ts);
-    } catch (err) {
-      console.error(err);
-      // draw the error text on canvas so it's visible even if UI broke
-      try {
-        ctx.setTransform(1,0,0,1,0,0);
-        ctx.clearRect(0,0,canvas.width,canvas.height);
-        ctx.fillStyle = "rgba(0,0,0,0.88)";
-        ctx.fillRect(0,0,canvas.width,canvas.height);
-        ctx.fillStyle = "rgba(255,255,255,0.92)";
-        ctx.font = `${24*DPR}px system-ui`;
-        ctx.fillText("Planet Missions", 24*DPR, 50*DPR);
-        ctx.font = `${16*DPR}px system-ui`;
-        ctx.fillText("Oops — something crashed. Refresh the page.", 24*DPR, 80*DPR);
-      } catch {}
-      try { showToast("Oops — something crashed. Refresh the page.", 6.0); } catch {}
-      return; // stop looping
-    }
-    requestAnimationFrame(safeLoop);
-  }
-
 
   // First toast + waypoint
   showToast("Welcome, Space Explorer! Use the joystick to fly 🚀", 2.2);
   updateHud();
   // Speak the first mission (after first interaction on mobile)
   setTimeout(() => { speakMission(currentMission()); }, 250);
-  requestAnimationFrame(safeLoop);
+  requestAnimationFrame(loop);
 
 })();
 </script>
