@@ -1129,7 +1129,7 @@ function markMissionDone(type, target) {
   btnCenter.addEventListener("pointerdown", (e) => { e.preventDefault(); sfx.click(); camera.centerNow = true; showToast("Centered on ship", 1.2); });
 
   // ---------------- Camera ----------------
-  const camera = { x: 0, y: 0, centerNow:false };
+  const camera = { x: 0, y: 0, centerNow:true};
 
   function centerCamera(w, h) {
     camera.x = clamp(player.x - (w / DPR) * 0.5, 0, world.w - (w / DPR));
