@@ -1584,21 +1584,31 @@ function markMissionDone(type, target) {
     // Gravity (orbit/slingshot)
     applyGravity(dt);
 
-    // Controls: joystick + keyboard fallback
+    // Controls: joystick + keyboard
     const kbUp    = keys.has("ArrowUp") || keys.has("w");
     const kbDown  = keys.has("ArrowDown") || keys.has("s");
     const kbLeft  = keys.has("ArrowLeft") || keys.has("a");
     const kbRight = keys.has("ArrowRight") || keys.has("d");
     const kbBoost = keys.has("Shift");
 
+    // Start with joystick vector
     let ax = joy.dx;
     let ay = joy.dy;
 
-    if (!joy.active) {
-      ax = (kbRight ? 1 : 0) - (kbLeft ? 1 : 0);
-      ay = (kbDown ? 1 : 0) - (kbUp ? 1 : 0);
-      const len = Math.hypot(ax, ay) || 1;
-      ax /= len; ay /= len;
+    // Compute keyboard vector
+    let kx = (kbRight ? 1 : 0) - (kbLeft ? 1 : 0);
+    let ky = (kbDown ? 1 : 0) - (kbUp ? 1 : 0);
+    const kLen = Math.hypot(kx, ky);
+
+    // If keyboard is pressed, always prefer it (fixes cases where joystick gets "stuck" active)
+    if (kLen > 0.01) {
+      kx /= kLen; ky /= kLen;
+      ax = kx; ay = ky;
+    } else if (!joy.active) {
+      // No joystick active: keep (0,0) unless we had a tiny keyboard input
+      ax = 0; ay = 0;
+    } else {
+      // Joystick active: already using joy.dx/joy.dy
     }
 
     const boost = boosting || kbBoost;
@@ -1811,6 +1821,9 @@ updateHud();
       ctx.font = `${14*DPR}px system-ui`;
       ctx.fillText("Satellite", x - 30*DPR, y + 32*DPR);
     }
+
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = "source-over";
 
     // Player
     const px = (player.x - camera.x) * DPR;
