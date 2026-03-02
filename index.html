@@ -227,11 +227,11 @@
 <body>
 <canvas id="c" tabindex="0"></canvas>
 
-  <div id="fatalOverlay" style="position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.85);color:rgba(255,255,255,0.95);padding:18px;z-index:50;font-family:system-ui;">
+  <div id="fatalOverlay" style="position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.88);color:rgba(255,255,255,0.95);padding:18px;z-index:60;font-family:system-ui;">
     <div style="max-width:820px;">
       <div style="font-size:22px;font-weight:900;margin-bottom:8px;">Game error</div>
-      <div id="fatalMsg" style="white-space:pre-wrap;font-size:14px;line-height:1.3;opacity:0.9;"></div>
-      <div style="margin-top:12px;font-size:12px;opacity:0.75;">Tip: If you’re on GitHub Pages, refresh with ?v=123 to bypass cache.</div>
+      <div id="fatalMsg" style="white-space:pre-wrap;font-size:14px;line-height:1.35;opacity:0.95;"></div>
+      <div style="margin-top:12px;font-size:12px;opacity:0.75;">Tip: refresh with ?v=123 to bypass cache.</div>
     </div>
   </div>
 
@@ -305,22 +305,32 @@
 
 
 <script>
+
 (() => {
   // ---------------- Canvas setup ----------------
   const canvas = document.getElementById("c");
   const ctx = canvas.getContext("2d");
 
 
-  const fatalOverlay = document.getElementById("fatalOverlay");
-  const fatalMsg = document.getElementById("fatalMsg");
-  function showFatal(err) {
-    try {
-      fatalMsg.textContent = String(err && err.stack ? err.stack : err);
-      fatalOverlay.style.display = "flex";
-    } catch {}
+  // Canvas polyfill: roundRect (older Android/WebView)
+  if (typeof CanvasRenderingContext2D !== "undefined" && !CanvasRenderingContext2D.prototype.roundRect) {
+    CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+      if (Array.isArray(r)) r = r[0] ?? 0;
+      r = Math.max(0, Math.min(r || 0, Math.min(w, h) / 2));
+      this.beginPath();
+      this.moveTo(x + r, y);
+      this.lineTo(x + w - r, y);
+      this.arcTo(x + w, y, x + w, y + r, r);
+      this.lineTo(x + w, y + h - r);
+      this.arcTo(x + w, y + h, x + w - r, y + h, r);
+      this.lineTo(x + r, y + h);
+      this.arcTo(x, y + h, x, y + h - r, r);
+      this.lineTo(x, y + r);
+      this.arcTo(x, y, x + r, y, r);
+      this.closePath();
+      return this;
+    };
   }
-  window.addEventListener("error", (e) => { showFatal(e.error || e.message || e); });
-  window.addEventListener("unhandledrejection", (e) => { showFatal(e.reason || e); });
 
   const DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
   function resize() {
@@ -330,24 +340,7 @@
   addEventListener("resize", resize);
   resize();
 
-  
-  
-
-  // Start the main loop (with crash guard)
-  function safeLoop(ts) {
-    try {
-      loop(ts);
-    } catch (err) {
-      console.error(err);
-      showFatal(err);
-      return;
-    }
-    requestAnimationFrame(safeLoop);
-  }
-  requestAnimationFrame(safeLoop);
-
-camera.centerNow = true;
-// Map canvas
+  // Map canvas
   const mapOverlay = document.getElementById("mapOverlay");
   const mapCanvas = document.getElementById("mapCanvas");
   const mapCtx = mapCanvas.getContext("2d");
@@ -366,19 +359,6 @@ camera.centerNow = true;
     return dx*dx + dy*dy;
   };
 
-  // ---------------- Settings (Sound / Voice / Skins) ----------------
-  const SETTINGS_KEY = "planetGameSettings_v1";
-  const PROGRESS_KEY = "planetGameProgress_v1";
-
-  let userInteracted = false; // required for audio/voice on many mobile browsers
-  document.addEventListener("pointerdown", () => { userInteracted = true; }, { passive: true });
-
-  const defaultSettings = {
-    soundOn: true,
-    voiceOn: true,
-    skinId: "mint"
-  };
-
   function loadSettings() {
     try {
       const raw = localStorage.getItem(SETTINGS_KEY);
@@ -387,6 +367,17 @@ camera.centerNow = true;
       return { ...defaultSettings };
     }
   }
+
+  const fatalOverlay = document.getElementById("fatalOverlay");
+  const fatalMsg = document.getElementById("fatalMsg");
+  function showFatal(err) {
+    const txt = (err && err.stack) ? err.stack : String(err || "Unknown error");
+    if (fatalMsg) fatalMsg.textContent = txt;
+    if (fatalOverlay) fatalOverlay.style.display = "flex";
+  }
+  window.addEventListener("error", (e) => showFatal(e.error || e.message || e));
+  window.addEventListener("unhandledrejection", (e) => showFatal(e.reason || e));
+
   function saveSettings() {
     try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch {}
   }
@@ -700,8 +691,8 @@ camera.centerNow = true;
   // ---------------- Missions (more types) ----------------
   // Types: VISIT, COLLECT, PHOTO, RESCUE, DELIVER
   
+
 const missions = [
-  // Early easy missions
   { type:"VISIT",   target:"mercury", done:false, text:"Fly to Mercury" },
   { type:"VISIT",   target:"venus",   done:false, text:"Fly to Venus" },
   { type:"PHOTO",   target:"venus",   done:false, text:"Take a photo of Venus clouds (Interact near Venus)" },
@@ -713,7 +704,6 @@ const missions = [
   { type:"VISIT",   target:"mars",    done:false, text:"Fly to Mars" },
   { type:"COLLECT", target:"mars",    done:false, text:"Collect a Mars sample (Interact near Mars)" },
 
-  // Big planets tour
   { type:"VISIT",   target:"jupiter", done:false, text:"Fly to Jupiter" },
   { type:"COLLECT", target:"jupiter", done:false, text:"Collect a Jupiter sample (Interact near Jupiter)" },
 
@@ -726,13 +716,12 @@ const missions = [
   { type:"VISIT",   target:"neptune", done:false, text:"Fly to Neptune" },
   { type:"COLLECT", target:"neptune", done:false, text:"Collect a Neptune sample (Interact near Neptune)" },
 
-  // Space hero missions
   { type:"RESCUE",  target:"sat",     done:false, text:"Rescue the Lost Satellite (fly to it + Interact)" },
   { type:"DELIVER", target:"station", done:false, text:"Deliver satellite parts to the Space Station" },
 
-  // Final return
   { type:"DELIVER", target:"earth",   done:false, text:"Return to Earth and deliver everything (Interact on Earth)" }
 ];
+
 
 
   function currentMission() {
@@ -942,88 +931,25 @@ function markMissionDone(type, target) {
     sfx.click();
   });
 
-  pillSkin.addEventListener("pointerdown", (e) => {
-    e.preventDefault();
+pillSkin.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  cycleSkin();
+});
 
+btnBadges.addEventListener("pointerdown", (e) => { e.preventDefault(); toggleCollect(); });
+btnCloseCollect.addEventListener("pointerdown", (e) => { e.preventDefault(); closeCollect(); });
 
-  // ---------------- Badge Collection Screen ----------------
-  const collectOverlay = document.getElementById("collectOverlay");
-  const btnBadges = document.getElementById("btnBadges");
-  const btnCloseCollect = document.getElementById("btnCloseCollect");
-  const badgeGrid = document.getElementById("badgeGrid");
-  const skinGrid = document.getElementById("skinGrid");
-  const collectSummary = document.getElementById("collectSummary");
-  const btnResetProgress = document.getElementById("btnResetProgress");
-
-  let collectOpen = false;
-
-  function openCollect() {
-    collectOpen = true;
-    collectOverlay.style.display = "block";
-    renderCollection();
-    sfx.click();
-  }
-  function closeCollect() {
-    collectOpen = false;
-    collectOverlay.style.display = "none";
-    sfx.click();
-  }
-  function toggleCollect() {
-    collectOpen ? closeCollect() : openCollect();
-  }
-
-  function renderCollection() {
-    collectSummary.textContent = `Badges: ${progress.unlockedBadges.length}/${badges.length} · Skins: ${progress.unlockedSkins.length}/${skins.length}`;
-
-    badgeGrid.innerHTML = "";
-    for (const b of badges) {
-      const unlocked = progress.unlockedBadges.includes(b.id);
-      const el = document.createElement("div");
-      el.className = "card" + (unlocked ? "" : " locked");
-      el.innerHTML = `
-        <div class="cTitle">${unlocked ? "🏆" : "🔒"} ${b.title}</div>
-        <div class="cDesc">${unlocked ? b.desc : "Keep playing to unlock this badge."}</div>
-      `;
-      badgeGrid.appendChild(el);
-    }
-
-    skinGrid.innerHTML = "";
-    for (const s of skins) {
-      const unlocked = progress.unlockedSkins.includes(s.id);
-      const active = settings.skinId === s.id;
-      const el = document.createElement("div");
-      el.className = "card" + (unlocked ? "" : " locked");
-      el.innerHTML = `
-        <div class="cTitle">${unlocked ? (active ? "✅" : "🎨") : "🔒"} ${s.name}</div>
-        <div class="cDesc">${unlocked ? "Tap to use this skin." : "Earn more badges/missions to unlock."}</div>
-      `;
-      el.addEventListener("pointerdown", (e) => {
-        e.preventDefault();
-        if (!unlocked) { showToast("That skin is locked 🙂", 1.2); return; }
-        setSkin(s.id);
-        renderCollection();
-      });
-      skinGrid.appendChild(el);
-    }
-  }
-
-  btnBadges.addEventListener("pointerdown", (e) => { e.preventDefault(); toggleCollect(); });
-  btnCloseCollect.addEventListener("pointerdown", (e) => { e.preventDefault(); closeCollect(); });
-
-  btnResetProgress.addEventListener("pointerdown", (e) => {
-    e.preventDefault();
-    sfx.click();
-    const ok = confirm("Reset progress? This will clear badges and skins on this device.");
-    if (!ok) return;
-    try {
-      localStorage.removeItem(PROGRESS_KEY);
-      localStorage.removeItem(SETTINGS_KEY);
-    } catch {}
-    location.reload();
-  });
-
-    cycleSkin();
-  });
+btnResetProgress.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  sfx.click();
+  const ok = confirm("Reset progress? This will clear badges and skins on this device.");
+  if (!ok) return;
+  try {
+    localStorage.removeItem(PROGRESS_KEY);
+    localStorage.removeItem(SETTINGS_KEY);
+  } catch {}
+  location.reload();
+});
 
   let toast = { msg:"", t:0 };
   function showToast(msg, seconds=2) {
@@ -1042,46 +968,15 @@ function markMissionDone(type, target) {
 
   // ---------------- Keyboard input (optional) ----------------
   const keys = new Set();
+  addEventListener("keydown", (e) => {
+    if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," ","Shift","m","M","w","a","s","d","W","A","S","D"].includes(e.key)) e.preventDefault();
+    keys.add(e.key);
 
-  function keyName(e) {
-    // Use both e.key and e.code so WASD works across keyboards/devices.
-    // Normalize to a small set used by update().
-    const k = e.key;
-    const c = e.code;
-    if (c === "KeyW" || k === "w" || k === "W") return "w";
-    if (c === "KeyA" || k === "a" || k === "A") return "a";
-    if (c === "KeyS" || k === "s" || k === "S") return "s";
-    if (c === "KeyD" || k === "d" || k === "D") return "d";
-    if (c === "ArrowUp"   || k === "ArrowUp") return "ArrowUp";
-    if (c === "ArrowDown" || k === "ArrowDown") return "ArrowDown";
-    if (c === "ArrowLeft" || k === "ArrowLeft") return "ArrowLeft";
-    if (c === "ArrowRight"|| k === "ArrowRight") return "ArrowRight";
-    if (c === "ShiftLeft" || c === "ShiftRight" || k === "Shift") return "Shift";
-    if (c === "Space" || k === " ") return "Space";
-    if (c === "KeyM" || k === "m" || k === "M") return "m";
-    return null;
-  }
+    if (e.key === "m" || e.key === "M") toggleMap();
+    if (e.key === " ") tryInteract();
+  });
+  addEventListener("keyup", (e) => keys.delete(e.key));
 
-  function onKeyDown(e) {
-    const k = keyName(e);
-    if (!k) return;
-    e.preventDefault();
-    keys.add(k);
-
-    if (k === "m") toggleMap();
-    if (k === "Space") tryInteract();
-  }
-  function onKeyUp(e) {
-    const k = keyName(e);
-    if (!k) return;
-    e.preventDefault();
-    keys.delete(k);
-  }
-
-  window.addEventListener("keydown", onKeyDown, { passive:false });
-  window.addEventListener("keyup", onKeyUp, { passive:false });
-
-  // Make sure the canvas can receive focus so keyboards work reliably.
   canvas.addEventListener("pointerdown", () => canvas.focus());
 
   // ---------------- Touch Joystick ----------------
@@ -1401,6 +1296,7 @@ function markMissionDone(type, target) {
 
 
 
+  
   function drawShipIcon(g, x, y, angleRad, size, boosting) {
     const sk = currentSkin();
     g.save();
@@ -1432,7 +1328,8 @@ function markMissionDone(type, target) {
       g.closePath();
       g.fill();
     }
-
+    g.restore();
+  }
 
   function drawWaypointIconWorld(g, x, y, angleRad, size) {
     // A little flag + star, rotated to point toward the waypoint
@@ -1500,9 +1397,6 @@ function markMissionDone(type, target) {
     g.beginPath();
     g.arc(0, 0, 3.5 * DPR, 0, Math.PI * 2);
     g.fill();
-
-    g.restore();
-  }
 
     g.restore();
   }
@@ -1622,31 +1516,21 @@ function markMissionDone(type, target) {
     // Gravity (orbit/slingshot)
     applyGravity(dt);
 
-    // Controls: joystick + keyboard
-    const kbUp    = keys.has("ArrowUp") || keys.has("w");
-    const kbDown  = keys.has("ArrowDown") || keys.has("s");
-    const kbLeft  = keys.has("ArrowLeft") || keys.has("a");
-    const kbRight = keys.has("ArrowRight") || keys.has("d");
+    // Controls: joystick + keyboard fallback
+    const kbUp    = keys.has("ArrowUp") || keys.has("w") || keys.has("W");
+    const kbDown  = keys.has("ArrowDown") || keys.has("s") || keys.has("S");
+    const kbLeft  = keys.has("ArrowLeft") || keys.has("a") || keys.has("A");
+    const kbRight = keys.has("ArrowRight") || keys.has("d") || keys.has("D");
     const kbBoost = keys.has("Shift");
 
-    // Start with joystick vector
     let ax = joy.dx;
     let ay = joy.dy;
 
-    // Compute keyboard vector
-    let kx = (kbRight ? 1 : 0) - (kbLeft ? 1 : 0);
-    let ky = (kbDown ? 1 : 0) - (kbUp ? 1 : 0);
-    const kLen = Math.hypot(kx, ky);
-
-    // If keyboard is pressed, always prefer it (fixes cases where joystick gets "stuck" active)
-    if (kLen > 0.01) {
-      kx /= kLen; ky /= kLen;
-      ax = kx; ay = ky;
-    } else if (!joy.active) {
-      // No joystick active: keep (0,0) unless we had a tiny keyboard input
-      ax = 0; ay = 0;
-    } else {
-      // Joystick active: already using joy.dx/joy.dy
+    if (!joy.active) {
+      ax = (kbRight ? 1 : 0) - (kbLeft ? 1 : 0);
+      ay = (kbDown ? 1 : 0) - (kbUp ? 1 : 0);
+      const len = Math.hypot(ax, ay) || 1;
+      ax /= len; ay /= len;
     }
 
     const boost = boosting || kbBoost;
@@ -1735,6 +1619,8 @@ updateHud();
 
   // ---------------- Render ----------------
   function render() {
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = "source-over";
     const w = canvas.width, h = canvas.height;
 
     // Background gradient
@@ -1755,8 +1641,6 @@ updateHud();
       ctx.arc(sx, sy, s.r * DPR, 0, Math.PI * 2);
       ctx.fill();
     }
-    ctx.globalAlpha = 1;
-
     ctx.globalAlpha = 1;
 
     // Skin trail
@@ -1862,12 +1746,6 @@ updateHud();
       ctx.fillText("Satellite", x - 30*DPR, y + 32*DPR);
     }
 
-    ctx.globalAlpha = 1;
-    ctx.globalCompositeOperation = "source-over";
-
-    ctx.globalAlpha = 1;
-    ctx.globalCompositeOperation = "source-over";
-
     // Player
     const px = (player.x - camera.x) * DPR;
     const py = (player.y - camera.y) * DPR;
@@ -1881,16 +1759,6 @@ updateHud();
     ctx.stroke();
 
     
-    // Debug marker (helps confirm player is on-screen)
-    ctx.save();
-    ctx.strokeStyle = "rgba(0,255,180,0.55)";
-    ctx.lineWidth = 2 * DPR;
-    ctx.beginPath();
-    ctx.moveTo(px - 18*DPR, py); ctx.lineTo(px + 18*DPR, py);
-    ctx.moveTo(px, py - 18*DPR); ctx.lineTo(px, py + 18*DPR);
-    ctx.stroke();
-    ctx.restore();
-
     // Draw player spaceship (skin) instead of image
     {
       const sk = currentSkin();
@@ -1945,13 +1813,13 @@ updateHud();
   }
 
   // ---------------- Main loop ----------------
-  last = performance.now();
+  let last = performance.now();
   function loop(now) {
     const dt = Math.min(0.033, (now - last) / 1000);
     last = now;
     update(dt);
     render();
-
+    requestAnimationFrame(loop);
   }
 
   // First toast + waypoint
@@ -1959,8 +1827,10 @@ updateHud();
   updateHud();
   // Speak the first mission (after first interaction on mobile)
   setTimeout(() => { speakMission(currentMission()); }, 250);
+  requestAnimationFrame(loop);
 
 })();
+
 </script>
 </body>
 </html>
